@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超絕那古野行 - 模組化行程手冊</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background-color: #E8E2D9; 
+            margin: 0; 
+            color: #334155;
+            -webkit-font-smoothing: antialiased;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .timeline-line { 
+            position: absolute; 
+            left: 11px; 
+            top: 36px; 
+            bottom: -48px; 
+            width: 1.5px; 
+            background-color: #CFC5B8; 
+        }
+        .last-event .timeline-line { display: none; }
+
+        @media (min-width: 1024px) {
+            .timeline-line-center { 
+                position: absolute; 
+                left: 30%; 
+                top: 0; 
+                bottom: 0; 
+                width: 1px; 
+                background: linear-gradient(to bottom, #E8E2D9, #CFC5B8 15%, #CFC5B8 85%, #E8E2D9);
+            }
+        }
+        
+        .culture-card {
+            border-left: 4px solid #3B82F6; 
+            background-color: #FFF9F0; 
+            line-height: 1.8;
+            letter-spacing: 0.02em;
+            box-shadow: inset 0 0 15px rgba(232, 226, 217, 0.2);
+        }
+
+        .nav-active {
+            background-color: #2563EB !important;
+            color: white !important;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+        }
+
+        .restaurant-link, .supply-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background-color: white;
+            border: 1px solid #D4C7B8;
+            color: #1E293B;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-decoration: none;
+            margin-bottom: 8px;
+        }
+        .supply-link {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            padding: 10px 12px;
+        }
+        .restaurant-link:hover {
+            background-color: #F8FAFC;
+            border-color: #3B82F6;
+            color: #2563EB;
+            transform: translateX(4px);
+        }
+        .supply-link:hover {
+            background-color: #F0FDF4;
+            border-color: #22C55E;
+            color: #16A34A;
+            transform: translateX(4px);
+        }
+
+        .spot-map-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 12px;
+            border-radius: 99px;
+            background-color: #2563EB;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            transition: all 0.2s;
+            text-decoration: none;
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
+        }
+        .spot-map-btn:hover {
+            background-color: #1D4ED8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+        }
+
+        .parking-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background-color: #F8FAFC;
+            border: 1px solid #BFDBFE;
+            color: #1E293B;
+            transition: all 0.2s;
+            text-decoration: none;
+            margin-bottom: 8px;
+        }
+        .parking-link:hover {
+            background-color: #EFF6FF;
+            border-color: #3B82F6;
+            color: #1D4ED8;
+            transform: translateX(4px);
+        }
+
+        /* 增加全局的 focus-visible 樣式以提升鍵盤無障礙體驗 */
+        a:focus-visible, button:focus-visible {
+            outline: none;
+        }
+    </style>
+
+    <!-- PWA 與離線快取支援模組 -->
+    <script>
+        // 由於我們目前在一個特殊的 iframe 環境中執行，且受到同源政策 (Same-Origin Policy) 限制，
+        // 使用 blob: URL 動態註冊 Service Worker 會被瀏覽器阻擋（因為 blob: URL 不是安全的來源，且無法控制 scope）。
+        // 因此，在這個單一檔案的預覽環境中，我們暫時移除 Service Worker 的註冊邏輯。
+        // 如果您將此檔案部署到自己的 HTTPS 伺服器，您可以建立一個獨立的 sw.js 檔案並正常註冊。
+
+        // 保留 Manifest 動態生成，讓某些瀏覽器可能仍可「加到主畫面」
+        window.addEventListener('load', () => {
+            try {
+                const manifest = {
+                    name: "超絕那古野行 - 離線手冊",
+                    short_name: "那古野行",
+                    display: "standalone",
+                    start_url: location.pathname,
+                    scope: location.pathname.substring(0, location.pathname.lastIndexOf('/') + 1),
+                    background_color: "#E8E2D9",
+                    theme_color: "#2563EB",
+                    icons: [
+                        {
+                            src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMjU2M0VCIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTEyIDJMMiA3bDEwIDUgMTAtNS0xMC01ek0yIDE3bDEwIDUgMTAtNU0yIDEybDEwIDUgMTAtNSIvPjwvc3ZnPg==",
+                            sizes: "192x192",
+                            type: "image/svg+xml",
+                            purpose: "any maskable"
+                        },
+                        {
+                            src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMjU2M0VCIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTEyIDJMMiA3bDEwIDUgMTAtNS0xMC01ek0yIDE3bDEwIDUgMTAtNU0yIDEybDEwIDUgMTAtNSIvPjwvc3ZnPg==",
+                            sizes: "512x512",
+                            type: "image/svg+xml",
+                            purpose: "any maskable"
+                        }
+                    ]
+                };
+                const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+                const link = document.createElement('link');
+                link.rel = 'manifest';
+                link.href = URL.createObjectURL(manifestBlob);
+                document.head.appendChild(link);
+                console.log('Manifest 建立成功');
+            } catch (e) {
+                console.error('Manifest 建立失敗:', e);
+            }
+            
+            // 由於無法在此環境使用 SW，我們模擬發送一個錯誤事件，讓 UI 顯示無法離線
+            window.dispatchEvent(new CustomEvent('sw-status', { 
+                detail: { 
+                    status: 'error', 
+                    message: '當前預覽環境不支援 Service Worker 離線快取。請將檔案部署至獨立 HTTPS 伺服器並使用獨立的 sw.js 檔案。' 
+                } 
+            }));
+        });
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        /**
+         * 1. 資料層 (Data Layer)
+         * 加入了行前準備 (isPrep) 與各天的特產/紀念品 (souvenirs) 以及歷史氣候與穿搭建議 (weatherAdvice)
+         */
+        const ITINERARY_DATA = [
+            {
+                tabLabel: "行前準備", date: "出發前", theme: "重要備忘與打包清單", isPrep: true,
+                memos: [
+                    { icon: "alert-triangle", title: "黃金週警報", text: "4/29-5/3 為日本連假，建議提早出發並多預留彈性時間以避開車潮。" },
+                    { icon: "calendar-check", title: "預約清單確認", text: "Gattan Go! 與阿智村星空導覽必須持網上預購憑證。上高地巴士則可現場購票。" },
+                    { icon: "thermometer-snowflake", title: "極端溫差對策", text: "山區早晚溫差極大（可能低至 5 度），請務必攜帶防風保暖羽絨外套與多層次穿著衣物。" }
+                ],
+                checklists: [
+                    { 
+                        title: "證件與票券", 
+                        items: ["護照 (效期需滿6個月以上)", "日幣現金與多張備用信用卡", "國際駕照與台灣駕照正本 (缺一不可)", "Visit Japan Web 登錄完成截圖", "所有預約確認信件與憑證"] 
+                    },
+                    { 
+                        title: "隨身與實用裝備", 
+                        items: ["跨國上網準備 (eSIM / 實體SIM卡提前申辦與開通)", "行動電源、充電線與萬用轉接頭", "雨傘、雨衣等輕便雨具", "高防曬係數防曬乳與太陽眼鏡", "暈車藥、腸胃藥等常備藥品"] 
+                    },
+                    { 
+                        title: "衣物與穿搭 (極端溫差對策)", 
+                        items: ["冬季防風防水厚外套 (阿智村 0°C 觀星、上高地必備)", "保暖禦寒配件：發熱衣、毛帽、手套、圍巾", "輕便好收納的防風外套或輕薄羽絨服 (應對山區溫差)", "短袖、薄長袖與透氣外搭 (應對平地 25°C 微熱)", "好走且防滑的運動鞋或健走鞋 (溪谷步道必備)"] 
+                    }
+                ]
+            },
+            {
+                tabLabel: "Day 1", date: "4/25 (週六)", theme: "名古屋—岐阜—郡上",
+                weatherAdvice: {
+                    temp: "20°C~25°C (日) / 10°C~15°C (夜)",
+                    dress: "平地轉山區。白天氣候溫暖甚至微熱，建議以短袖或薄長袖為主，並隨身攜帶一件方便穿脫的輕薄外套，以應對傍晚太陽下山後的微涼溫差。"
+                },
+                souvenirs: [
+                    { icon: "gift", title: "郡上八幡 食品模型", text: "郡上是日本食品模型的發源地，當地有許多超逼真的天婦羅或壽司鑰匙圈，十分有趣。" },
+                    { icon: "glass-water", title: "郡上地酒", text: "受惠於名水百選的清澈水源，當地釀造的日本酒風味絕佳，推薦帶一pr瓶回飯店小酌。" }
+                ],
+                events: [
+                    { time: "05:45", type: "transport", title: "中部國際機場 (NGO) 抵達", note: "建議預先填寫 Visit Japan Web" },
+                    { 
+                        time: "07:00", type: "food", title: "客美多咖啡 (Centrair店)", 
+                        mapUrl: "https://maps.app.goo.gl/Es43Y7QnaaKT573t6",
+                        desc: "名古屋特有的「買飲品送早餐」\n源於早期茶屋的轉型並延續款待客人的禮節。\n小倉吐司則是早餐文化的靈魂食物。", dur: "1h" 
+                    },
+                    { 
+                        time: "08:30", type: "transport", title: "Toyota Rental A Car", drive: "🚗 車程約 1 小時",
+                        parking: [
+                            { label: "最適", name: "岐阜公園 堤外駐車場", url: "https://www.google.com/maps/search/?api=1&query=岐阜公園+堤外駐車場&query_place_id=ChIJ3QaxGbSpA2AR7ETd8fT8qE4" },
+                            { label: "予備", name: "鏡岩緑地駐車場", url: "https://www.google.com/maps/search/?api=1&query=岐阜公園+鏡岩緑地駐車場&query_place_id=ChIJ7QfCQX2pA2ARplNcXnbwwZ0" }
+                        ]
+                    },
+                    { 
+                        time: "09:45", type: "spot", title: "岐阜城", 
+                        desc: "岐阜城意味著太平盛世的起點與儒家秩序的起源\n信長以實力重組日本社會「天下布武」的開始。\n這座俯瞰壯闊的美濃平原與長良川的山城，\n是亂世走向統一的轉折點。", dur: "2.5h" 
+                    },
+                    { 
+                        time: "12:30", type: "food", title: "岐阜市區午餐", 
+                        restaurants: [
+                            { name: "冷したぬき天国 川原町店", url: "https://maps.app.goo.gl/Y4GCB1anUzQFzj2V8" },
+                            { name: "城下町カフェ 魚久", url: "https://maps.app.goo.gl/TcnhKUa9fSU6Jqea6" },
+                            { name: "四季彩うどん 華きんとん", url: "https://maps.app.goo.gl/XHFZ4J5vDdWu2vGj7" },
+                            { name: "丸デブ 総本店", url: "https://maps.app.goo.gl/gZ5rLADEeZEVBQkSA" }
+                        ]
+                    },
+                    {
+                        time: "14:00", type: "transport", title: "前往郡上八幡", drive: "🚗 車程約 1 小時",
+                        parking: [
+                            { label: "最適", name: "城下町廣場停車場", url: "https://maps.app.goo.gl/yYvS6RPh9s8QoUKe7" },
+                            { label: "予備", name: "山頂駐車場", url: "https://maps.app.goo.gl/o1H9vV1k5P14C3V18" }
+                        ]
+                    },
+                    { 
+                        time: "15:00", type: "spot", title: "郡上八幡城", 
+                        desc: "這裡被譽為水之城\n水質清澈位居「日本名水百選」之首\n連歌大師飯尾宗祇也在此以詩會友而得名傳奇古井宗祇水\n獨特的「水舟」系統將水資源使用的淋漓盡致", dur: "1.5h" 
+                    },
+                    { 
+                        time: "17:00", type: "food", title: "郡上晚餐", 
+                        restaurants: [
+                            { name: "鉄板料理 泉坂", url: "https://maps.app.goo.gl/SuPZs8wDFKri28vg8" },
+                            { name: "焼肉わかば", url: "https://maps.app.goo.gl/yLcUo6nbxc4z6MbEA" },
+                            { name: "郡上豚骨ラーメン カンミナ", url: "https://maps.app.goo.gl/4vRbVS2Nw7WYWNFx9" },
+                            { name: "村田 Murata", url: "https://maps.app.goo.gl/RK5MbmErgQiZLi4Y7" }
+                        ]
+                    },
+                    { 
+                        time: "18:00", type: "hotel", title: "郡上住宿", note: "入住飯店休息", mapUrl: "https://maps.app.goo.gl/92H87f5TyJCdR3gM6",
+                        supplies: [
+                            { name: "Valor 郡上店 (大型連鎖超市)", url: "https://maps.google.com/?cid=10878412299131047943&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "開車過去僅需幾分鐘，營業至晚上 20:00。品項齊全，買水、零食、熟食都非常方便。" }
+                        ]
+                    }
+                ]
+            },
+            {
+                tabLabel: "Day 2", date: "4/26 (週日)", theme: "郡上—白川鄉—高山—神岡",
+                weatherAdvice: {
+                    temp: "15°C~20°C (日) / 5°C~10°C (夜)",
+                    dress: "深入飛驒山區，氣溫會明顯下降。白天涼爽舒適，建議穿著長袖上衣；早晚偏冷，強烈建議攜帶防風外套或輕薄羽絨服保暖。"
+                },
+                souvenirs: [
+                    { icon: "smile", title: "飛驒娃娃 (さるぼぼ)", text: "高山老街必買的無臉娃娃，不同顏色代表不同祈願（紅、金、粉等），是當地守護神。" },
+                    { icon: "soup", title: "朴葉味噌", text: "飛驒地區特有的鄉土料理沾醬，買回家配白飯或自己烤飛驒牛都非常百搭！" }
+                ],
+                events: [
+                    { 
+                        time: "09:00", type: "transport", title: "郡上八幡出發", drive: "🚗 前往白川鄉 (1h 15m)",
+                        parking: [
+                            { label: "最適", name: "村営せせらぎ公園駐車場", url: "https://maps.google.com/?cid=30559143374984611&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" },
+                            { label: "予備", name: "村営みだしま公園臨時駐車場", url: "https://maps.google.com/?cid=10035245098017660086&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "10:15", type: "spot", title: "白川鄉合掌村", 
+                        desc: "世界文化遺產一棟棟宛如童話書中的「合掌造」建築。\n為了應對冬季極端的大雪，屋頂被設計形似雙手合十祈禱而得名。\n更承載了當地人稱為「結」的互助精神。", dur: "2h" 
+                    },
+                    { 
+                        time: "12:15", type: "food", title: "白川鄉午餐", 
+                        restaurants: [
+                            { name: "京や", url: "https://maps.app.goo.gl/Tmr2PJmcSsjr9dwz8" },
+                            { name: "国八食堂", url: "https://maps.app.goo.gl/KeBkvQrGYUnWJJDq7" },
+                            { name: "麵屋白川", url: "https://maps.app.goo.gl/h6Ugo8jkg6AJDZM37" },
+                            { name: "しらおぎ", url: "https://maps.app.goo.gl/CXPpRsSFabqEAwkcA" }
+                        ]
+                    },
+                    {
+                        time: "13:30", type: "transport", title: "前往高山", drive: "🚗 車程約 1h",
+                        parking: [
+                            { label: "最適", name: "高山市營 上二之町駐車場", url: "https://maps.app.goo.gl/3wGzFfL9V3n5v1rP9" },
+                            { label: "予備", name: "高山市營 空町駐車場", url: "https://maps.app.goo.gl/7L9GzR1S2W3M4N5Q8" }
+                        ]
+                    },
+                    { 
+                        time: "14:30", type: "spot", title: "高山市老街", 
+                        desc: "素有「飛驒小京都」之美稱。\n全日本唯一完整留存的幕府代官所「高山陣屋」是見證江戶歷史的傳奇遺跡。\n老街區以黑色木造建築與精緻的格子窗聞名。", dur: "3h" 
+                    },
+                    { time: "17:30", type: "transport", title: "前往神岡", drive: "🚗 車程約 1h" },
+                    { 
+                        time: "18:30", type: "food", title: "神岡晚餐", 
+                        restaurants: [
+                            { name: "焼肉 けや木", url: "https://maps.app.goo.gl/tGu1nURYNkj7wTAz7" },
+                            { name: "たからや Takaraya", url: "https://maps.app.goo.gl/kmEDVSQrUG3odo64A" }
+                        ] 
+                    },
+                    { 
+                        time: "19:30", type: "hotel", title: "神岡住宿", note: "入住飯店休息", mapUrl: "https://maps.app.goo.gl/td2skm3excChu2dVA",
+                        supplies: [
+                            { name: "Valor 神岡店 (大型超市)", url: "https://maps.google.com/?cid=7555947183025157585&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "適合大量補給" },
+                            { name: "Daily Yamazaki 神岡本町店", url: "https://maps.google.com/?cid=13010747230847280007&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "24小時便利商店" }
+                        ]
+                    }
+                ]
+            },
+            {
+                tabLabel: "Day 3", date: "4/27 (週一)", theme: "鐵道單車與療癒溫泉",
+                weatherAdvice: {
+                    temp: "10°C~15°C (日) / 0°C~5°C (夜)",
+                    dress: "奧飛驒高海拔區，氣溫非常寒冷。請穿著發熱衣搭配保暖中層，並備妥冬季保暖厚外套。騎乘鐵道單車時會有冷風直吹，務必準備毛帽與手套防風。"
+                },
+                souvenirs: [
+                    { icon: "waves", title: "平湯溫泉 湯之花", text: "將平湯溫泉的精華帶回家，在家泡澡也能享受奧飛驒天然溫泉的療癒氣息。" },
+                    { icon: "leaf", title: "飛驒山椒粉", text: "香氣極其獨特且帶有清爽的麻感，撒在烤肉、鰻魚飯或拉麵上能極大提升風味。" }
+                ],
+                events: [
+                    { 
+                        time: "08:30", type: "transport", title: "出發", note: "前往 Gattan Go!! 站點",
+                        parking: [
+                            { label: "最適", name: "渓谷コース 専用駐車場", url: "https://maps.google.com/?cid=11007776001609966016&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "09:00", type: "experience", title: "Gattan Go!! 鐵道單車", 
+                        mapUrl: "https://maps.app.goo.gl/N6Tc7A7hpKFeXKpw5",
+                        desc: "源自日文模仿火車經過鐵軌產生的節奏聲。\n這是一座利用廢棄鐵道重生的觀光設施\n讓遊客能騎著特製的登山單車在鐵軌上奔馳。", dur: "1.5h" 
+                    },
+                    { 
+                        time: "11:00", type: "food", title: "神岡午餐", 
+                        restaurants: [
+                            { name: "奥飛騨らぁめん 八兵衛", url: "https://maps.app.goo.gl/CkawrcmuJxeNNkWFA" },
+                            { name: "もりのや", url: "https://maps.app.goo.gl/mVoBNzoxDk3w7qudA" },
+                            { name: "麵屋 遥", url: "https://maps.app.goo.gl/NtUZLrB1RdL8uVgA6" }
+                        ]
+                    },
+                    {
+                        time: "12:30", type: "transport", title: "前往平湯大瀑布", drive: "🚗 車程約 45m",
+                        parking: [
+                            { label: "最適", name: "平湯大滝駐車場", url: "https://maps.google.com/?cid=3647973582061318786&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" },
+                            { label: "予備", name: "滝見展望広場 駐車場", url: "https://maps.google.com/?cid=9407776172487023235&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "13:15", type: "spot", title: "平湯大瀑布", 
+                        desc: "名列日本百大瀑布之一。\n落差 64 公尺，為飛驒三大名瀑之一，四季景觀分明。", dur: "1.5h" 
+                    },
+                    { 
+                        time: "15:00", type: "hotel", title: "入住平湯溫泉", 
+                        desc: "奧飛驒地區歷史最悠久、規模也最大的溫泉鄉。\n有段泡湯療傷且回復體力的「白猿傳說」。", note: "宿：平湯溫泉", mapUrl: "https://maps.app.goo.gl/DVHUfeGZVB5x9SkL7" 
+                    },
+                    { 
+                        time: "17:00", type: "food", title: "平湯晚餐", 
+                        restaurants: [
+                            { name: "あんき屋", url: "https://maps.app.goo.gl/t52rgYbpHWBFqyV6" },
+                            { name: "酒處祿次", url: "https://maps.app.goo.gl/Qf1dR3iZsGzxHhmPA" },
+                            { name: "山菜喰い處 よし本", url: "https://maps.app.goo.gl/iWTCBrVoEUh1DDqs9" }
+                        ] 
+                    },
+                    { 
+                        time: "18:00", type: "hotel", title: "平湯住宿", note: "返回飯店休息", mapUrl: "https://maps.app.goo.gl/DVHUfeGZVB5x9SkL7",
+                        supplies: [
+                            { name: "Yamazaki Y Shop 奧飛驒平湯館店", url: "https://maps.google.com/?cid=5033876454081686551&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "小型便利商店。山區溫泉街資源較少，這間是平湯溫泉區內少數開到較晚（通常營業至晚上 23:00）的便利超商。" }
+                        ]
+                    }
+                ]
+            },
+            {
+                tabLabel: "Day 4", date: "4/28 (週二)", theme: "上高地健行與甲府",
+                weatherAdvice: {
+                    temp: "5°C~10°C (上高地) / 20°C+ (甲府)",
+                    dress: "極端溫差考驗日！清晨的上高地極冷，需穿著冬季防寒裝備（防風防水外套、毛帽）；但下山抵達甲府後氣溫會回升至 20 度以上，請採用「多層洋蔥式穿法」，方便下山後隨時脫卸至薄長袖。"
+                },
+                souvenirs: [
+                    { icon: "wine", title: "甲州葡萄酒", text: "山梨縣是日本葡萄酒的心臟，甲州品種白酒更是搭配日式料理的絕佳選擇。" },
+                    { icon: "cookie", title: "桔梗信玄餅", text: "山梨縣最具代表性的伴手禮！灑滿黃豆粉並淋上黑蜜的柔軟麻糬，百吃不厭。" }
+                ],
+                events: [
+                    { 
+                        time: "06:00", type: "transport", title: "出發", note: "搭乘接駁巴士進入上高地",
+                        parking: [
+                            { label: "最適", name: "平湯バスターミナル", url: "https://maps.google.com/?cid=10048484545937668350&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "07:00", type: "spot", title: "上高地觀光", 
+                        desc: "神所居住之地\n以湛藍清澈的梓川與雄偉的穗高連峰交織而成。\n眺望依然覆蓋著殘雪的群山，感受神聖且靜謐。", dur: "4h" 
+                    },
+                    { time: "11:00", type: "transport", title: "下山前往松本", drive: "🚗 車程約 1.5h" },
+                    { 
+                        time: "13:30", type: "food", title: "松本午餐", 
+                        restaurants: [
+                            { name: "野麥", url: "https://maps.app.goo.gl/2BEVFbZpxjuY2sJA7" },
+                            { name: "山賊燒 河昌", url: "https://maps.app.goo.gl/WEYmnBC7wsM3ugwC8" },
+                            { name: "元祖山賊", url: "https://maps.app.goo.gl/phfNKtjVFpQ3ygiz6" },
+                            { name: "千石食堂", url: "https://maps.app.goo.gl/weqMsd7LERqyMnK88" },
+                            { name: "一步 居酒屋", url: "https://maps.app.goo.gl/pfL15BGtuaeXaCvT9" }
+                        ], drive: "🚗 前往甲府 (1.5h)" 
+                    },
+                    { 
+                        time: "16:00", type: "spot", title: "甲府城 (舞鶴城公園)", 
+                        desc: "甲府城曾是統治甲斐國的核心，如今保留壯麗的石垣與修復的門樓，從天守台可眺望富士山。", dur: "1.5h" 
+                    },
+                    { 
+                        time: "18:00", type: "food", title: "甲府晚餐", 
+                        restaurants: [
+                            { name: "手打そば 奥藤本店 甲府駅前店", url: "https://maps.app.goo.gl/Gv5a5JULW64TzV7a7" },
+                            { name: "肉ビストロ KAGURA", url: "https://maps.app.goo.gl/sCtpuKLisEoUjbzCA" },
+                            { name: "甲州ほうとう小作", url: "https://maps.app.goo.gl/ThRaGKcUY1z3QjG6A" }
+                        ] 
+                    },
+                    { 
+                        time: "19:00", type: "hotel", title: "甲府住宿", note: "入住飯店休息", mapUrl: "https://maps.app.goo.gl/tmrN7AgypPSnvomK8",
+                        supplies: [
+                            { name: "7-Eleven 甲府中央店", url: "https://maps.google.com/?cid=1309735750649833431&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "24小時便利商店（距離住宿點極近）" },
+                            { name: "FamilyMart 甲府中央店", url: "https://maps.google.com/?cid=7306107217972155062&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "24小時便利商店" }
+                        ]
+                    }
+                ]
+            },
+            {
+                tabLabel: "Day 5", date: "4/29 (週三)", theme: "戰國巡禮與夢幻夕陽",
+                weatherAdvice: {
+                    temp: "18°C~22°C (日) / 8°C~12°C (夜)",
+                    dress: "白天平地溫暖舒適，一般長袖加上休閒外套即可。但在諏訪湖畔賞夕陽時，湖面風勢較大容易帶走體溫，傍晚務必穿上防風外套避免著涼。"
+                },
+                souvenirs: [
+                    { icon: "gem", title: "昇仙峽 水晶與天然石", text: "昇仙峽自古盛產水晶，沿途有許多開採與加工店鋪，可挑選漂亮的天然石飾品作紀念。" },
+                    { icon: "shopping-bag", title: "TSURUYA 自有品牌", text: "長野縣最高級的超市，推薦瘋狂採購其自有品牌的蘋果果醬、果汁與各式健康零食。" }
+                ],
+                events: [
+                    { 
+                        time: "07:30", type: "transport", title: "前往武田神社", drive: "🚗 自駕前往",
+                        parking: [
+                            { label: "最適", name: "武田神社正面駐車場", url: "https://maps.google.com/?cid=17422402071853362687&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" },
+                            { label: "予備", name: "武田神社第1駐車場", url: "https://maps.google.com/?cid=3654156688011618273&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "08:00", type: "spot", title: "武田神社", 
+                        desc: "坐落於「躑躅崎館」舊址，這裡體現了信玄公「人即是城、人即是垣」的哲學。\n比起石牆，他更相信民心才是最強的屏障。", dur: "1.5h" 
+                    },
+                    { time: "09:30", type: "spot", title: "甲州夢小路", desc: "明治大正風情老街，充滿質感的雜貨與甜點店。" },
+                    { 
+                        time: "11:00", type: "food", title: "甲府午餐", 
+                        restaurants: [
+                            { name: "藤乙", url: "https://maps.app.goo.gl/zJvJ7ZExozfLWrwT8" },
+                            { name: "御食事處 音吉", url: "https://maps.app.goo.gl/5Fa5oEFXCwvtaocUA" },
+                            { name: "やまぎり食堂", url: "https://maps.app.goo.gl/S6EebVp8CHFN6PAT8" }
+                        ]
+                    },
+                    {
+                        time: "12:00", type: "transport", title: "前往昇仙峽區域", drive: "🚗 車程約 30m",
+                        parking: [
+                            { label: "昇仙峡最適", name: "ロープウェイ乗り場前駐車場", url: "https://maps.google.com/?cid=9218356555476274405&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" },
+                            { label: "昇仙峡予備", name: "昇仙峡滝上無料駐車場", url: "https://maps.google.com/?cid=17922553611824792465&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" },
+                            { label: "金櫻最適", name: "金櫻神社前駐車場", url: "https://maps.google.com/?cid=17647668631675869314&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" },
+                            { label: "金櫻予備", name: "金櫻神社駐車場", url: "https://maps.google.com/?cid=1894349006728977557&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "12:30", type: "spot", title: "昇仙峽 & 金櫻神社", 
+                        desc: "【昇仙峽】：「日本第一美溪」。\n以壯闊的花崗岩溪谷景觀聞名，巍峨聳立的「覺圓峰」與終點處優雅的「仙娥瀑布」。", dur: "3h" 
+                    },
+                    { time: "15:30", type: "transport", title: "前往諏訪湖", drive: "🚗 車程約 1h" },
+                    { 
+                        time: "17:30", type: "spot", title: "諏訪湖夕陽", 
+                        mapUrl: "https://maps.app.goo.gl/LTvM1m3t5uXSjnp66",
+                        desc: "《你的名字》中奇幻湖泊的原型。\n這片被群山環抱的圓形湖泊，相傳是「甲斐之虎」武田信玄的安息之地。", dur: "1h" 
+                    },
+                    { 
+                        time: "18:30", type: "food", title: "諏訪晚餐", 
+                        restaurants: [
+                            { name: "山ちゃん", url: "https://maps.app.goo.gl/XFAhVaQfQLMiqk3JA" },
+                            { name: "あひる", url: "https://maps.app.goo.gl/tJQ27g9uAEm7ySSg8" },
+                            { name: "星空食堂", url: "https://maps.app.goo.gl/VzBd1XCcrH4oBWYk8" }
+                        ] 
+                    },
+                    { 
+                        time: "19:30", type: "hotel", title: "諏訪住宿", note: "入住飯店休息", mapUrl: "https://maps.app.goo.gl/zZpvVMe8HPqF1QLD8",
+                        supplies: [
+                            { name: "TSURUYA 上諏訪店 (ツルヤ上諏訪店)", url: "https://maps.google.com/?cid=16184131564735207108&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "長野縣知名的高級大型超市。營業至晚上 20:00，自有品牌果汁、果醬和零食非常有名，強烈推薦在這裡順便買些特色伴手禮與隔天的車上零食。" }
+                        ]
+                    }
+                ]
+            },
+            {
+                tabLabel: "Day 6", date: "4/30 (週四)", theme: "古道宿場與賞花觀星",
+                weatherAdvice: {
+                    temp: "15°C~20°C (日) / 0°C~5°C (阿智村夜)",
+                    dress: "白天在古道健行穿著輕便舒適即可。※特別警告：夜晚前往阿智村高海拔觀星，因無遮蔽物氣溫將降至接近零度，請務必換上「冬季賞雪等級」的防寒裝備（厚羽絨、手套、圍巾）。"
+                },
+                souvenirs: [
+                    { icon: "trees", title: "木曾檜木工藝品", text: "妻籠宿周邊盛產高級檜木，手工製的木梳、便當盒或筷子散發著極致天然的木香。" },
+                    { icon: "cookie", title: "中津川 栗子特產", text: "中津川是和菓子「栗子金團 (栗きんとん)」的發源地，秋季之外也有許多栗子相關點心。" }
+                ],
+                events: [
+                    { time: "08:00", type: "spot", title: "諏訪大社", desc: "日本最古老的神社之一，感受古老信仰的莊嚴氛圍。", dur: "1.5h" },
+                    { 
+                        time: "09:30", type: "transport", title: "前往妻籠宿", drive: "🚗 車程約 1.5h (預留緩衝)",
+                        parking: [
+                            { label: "最適", name: "妻籠宿中央駐車場", url: "https://maps.google.com/?cid=17200915691140279762&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" },
+                            { label: "予備", name: "妻籠宿第二駐車場", url: "https://maps.google.com/?cid=8663891663597452545&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "11:00", type: "spot", title: "妻籠宿", 
+                        desc: "作為日本首座歷史保存區\n以「不賣、不租、不破壞」完美封存了江戶驛站風貌。", dur: "3h" 
+                    },
+                    { 
+                        time: "14:00", type: "transport", title: "前往阿智村", drive: "🚗 車程約 1h",
+                        parking: [
+                            { label: "花桃觀賞", name: "駐車場P2（花桃の里）", url: "https://maps.google.com/?cid=12993663076120939146&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "15:00", type: "experience", title: "阿智村賞桃花", 
+                        mapUrl: "https://maps.app.goo.gl/3q91JxY5psNppFEU8",
+                        desc: "阿智村的「花桃」被譽為日本第一。\n一萬多株紅、白、粉紅三色交織的花桃沿著河畔盛開。", dur: "2h" 
+                    },
+                    { time: "17:00", type: "food", title: "阿智村晚餐", note: "準備夜晚觀星行程" },
+                    { 
+                        time: "18:00", type: "transport", title: "前往天空樂園", drive: "🚗 準備前往搭乘纜車",
+                        parking: [
+                            { label: "星空觀賞", name: "ヘブンスそのはら駐車場", url: "https://maps.google.com/?cid=1698911642839467804&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "18:30", type: "experience", title: "天空樂園觀星", 
+                        mapUrl: "https://maps.app.goo.gl/K1BogV7BCSTFHZDi6",
+                        desc: "此地被環境省認證為「日本星空最亮點」。\n在海拔 1400 公尺的天空樂園，飽覽如雨般落下的銀河星斗。", dur: "2.5h" 
+                    },
+                    { 
+                        time: "21:30", type: "hotel", title: "中津川住宿", note: "入住飯店休息", mapUrl: "https://maps.app.goo.gl/svZyNR8axr8h6zQy9",
+                        supplies: [
+                            { name: "Super Center Okuwa 中津川店", url: "https://maps.google.com/?cid=6632805742766226859&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "超大型量販超市。開車路線順暢且腹地極大，營業時間長達晚上 23:00，是極佳的補給站。" },
+                            { name: "Valor 中津川駒場店 (大型超市)", url: "https://maps.google.com/?cid=954867895806215019&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    }
+                ]
+            },
+            {
+                tabLabel: "Day 7", date: "5/01 (週五)", theme: "自然秘境與巨岩城跡",
+                weatherAdvice: {
+                    temp: "18°C~22°C (日) / 10°C~12°C (夜)",
+                    dress: "峽谷與溫泉區氣候宜人。白天長袖加上休閒外套或薄針織衫非常舒適。前往付知峽或巖立峽步道時，路面可能濕滑，請務必穿著好走且防滑的運動鞋。"
+                },
+                souvenirs: [
+                    { icon: "smile", title: "下呂溫泉 青蛙周邊", text: "下呂 (Gero) 日文發音似青蛙叫聲，當地有許多可愛的青蛙造型神明與療癒小周邊。" },
+                    { icon: "cup-soda", title: "下呂布丁", text: "以復古可愛的青蛙標誌聞名，使用當地牛奶製作，是泡完溫泉後必吃的超人氣甜點。" }
+                ],
+                events: [
+                    { 
+                        time: "08:30", type: "transport", title: "前往苗木城跡", drive: "🚗 自駕前往",
+                        parking: [
+                            { label: "最適", name: "Times 苗木城跡 A1 駐車場", url: "https://maps.google.com/?cid=18065552631217506054&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" },
+                            { label: "予備", name: "苗木城 B1 駐車場", url: "https://maps.google.com/?cid=1559607403366136150&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "09:00", type: "spot", title: "苗木城跡", 
+                        desc: "東方馬丘比丘\n巧妙地將巨大花崗岩納入建築結構中，形成與山石共生的獨特石垣美學。", dur: "1.5h" 
+                    },
+                    { 
+                        time: "10:30", type: "transport", title: "前往付知峽", drive: "🚗 車程約 30m",
+                        parking: [
+                            { label: "最適", name: "付知峡駐車場（不動滝入口）", url: "https://maps.google.com/?cid=1780483359021423975&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "11:00", type: "spot", title: "付知峽", 
+                        desc: "通透如寶石般的「付知藍」溪水聞名，步道古木參天清澈見底。", dur: "1.5h" 
+                    },
+                    { 
+                        time: "13:00", type: "food", title: "午餐時間", 
+                        restaurants: [
+                            { name: "雞ちゃん専門店杉の子", url: "https://maps.app.goo.gl/Ea2c8UNzNSBQ2q2dA" },
+                            { name: "松葉", url: "https://maps.app.goo.gl/Jpt4pjQPjyGTWgYR8" }
+                        ]
+                    },
+                    {
+                        time: "14:00", type: "transport", title: "前往巖立峽", drive: "🚗 車程約 30m",
+                        parking: [
+                            { label: "最適", name: "がんだて公園 駐車場", url: "https://maps.google.com/?cid=16018223622563140917&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "14:30", type: "spot", title: "巖立峽", 
+                        desc: "五萬年前御嶽山大噴發所留下的巨大熔岩牆「巌立」。", dur: "2h" 
+                    },
+                    { 
+                        time: "17:00", type: "food", title: "上呂晚餐", 
+                        restaurants: [
+                            { name: "大衆食堂", url: "https://maps.app.goo.gl/srF4Any1mFArjWhK9" },
+                            { name: "牛一", url: "https://maps.app.goo.gl/kU9CcNdMZww917UR9" }
+                        ] 
+                    },
+                    { 
+                        time: "18:00", type: "hotel", title: "上呂住宿", note: "入住飯店休息", mapUrl: "https://maps.app.goo.gl/BDZNNFF8wK69qd4AA",
+                        supplies: [
+                            { name: "Valor 萩原店 (大型超市)", url: "https://maps.google.com/?cid=12237171622254016383&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "營業至晚上 20:00，適合在入住民宿前先買齊水與夜晚解饞的零食。" },
+                            { name: "LAWSON 萩原店 (備案)", url: "https://maps.google.com/?cid=4029330944066883008&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ", note: "24 小時營業，若太晚抵達時的備案補給點。" }
+                        ]
+                    }
+                ]
+            },
+            {
+                tabLabel: "Day 8", date: "5/02 (週六)", theme: "國寶犬山與大須購物",
+                weatherAdvice: {
+                    temp: "22°C~26°C (日) / 14°C~16°C (夜)",
+                    dress: "回到平地都會區，氣溫明顯回暖。白天有時會感到微熱，建議以短袖、薄長袖為主，並攜帶輕薄防曬外套。逛街行程多，請穿著舒適的步行鞋。"
+                },
+                souvenirs: [
+                    { icon: "cookie", title: "犬山 吉備糰子", text: "城下町非常受歡迎的串燒糰子，適合邊走邊吃或是帶回飯店當作宵夜點心。" },
+                    { icon: "shopping-bag", title: "大須觀音 雜貨與御守", text: "大須商店街新舊交融，除了參拜大須觀音求取御守，還能挖寶到許多獨特的古著與小雜貨。" }
+                ],
+                events: [
+                    { 
+                        time: "09:00", type: "transport", title: "前往犬山", drive: "🚗 車程約 1.5h",
+                        parking: [
+                            { label: "最適", name: "犬山城第1駐車場（東面）", url: "https://maps.google.com/?cid=12580631972024543961&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" },
+                            { label: "予備", name: "犬山城下町駐車場", url: "https://maps.google.com/?cid=4391229292243047541&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ" }
+                        ]
+                    },
+                    { 
+                        time: "10:30", type: "spot", title: "國寶犬山城", 
+                        desc: "日本五大國寶城之一全日本現存最古老天守閣。\n坐落於木曾川的臨江絕壁之上，被譽為「白帝城」。", dur: "2h" 
+                    },
+                    { 
+                        time: "12:30", type: "food", title: "犬山午餐", 
+                        restaurants: [
+                            { name: "松野屋", url: "https://maps.app.goo.gl/mXku7iULU4NLjswr5" },
+                            { name: "犬山 Gu Maru", url: "https://maps.app.goo.gl/QCQjPmdQHWYoj3Co8" },
+                            { name: "飛驒牛すき焼き専門店 肉兵衛本店", url: "https://maps.app.goo.gl/sMzueVDpEewffVGT6" }
+                        ], drive: "🚗 前往名古屋 (1h)" 
+                    },
+                    { time: "14:30", type: "hotel", title: "大須飯店 Check-in", note: "先放置行李" },
+                    { 
+                        time: "15:30", type: "spot", title: "大須商店街", 
+                        desc: "大須與秋葉原、日本橋並稱為「日本三大電器街」\n新舊文化在此毫無違和地共生。", note: "建議挑選名單中的餐廳作為晚餐。" 
+                    },
+                    { 
+                        time: "18:30", type: "food", title: "大須晚餐推薦", 
+                        restaurants: [
+                            { name: "Solo Pizza", url: "https://maps.app.goo.gl/BTrynieQ4hdsV5mB7" },
+                            { name: "やき鳥 角屋", url: "https://maps.app.goo.gl/jXzeEc7biMeBvQhK6" },
+                            { name: "大須せろり 大須本店", url: "https://maps.app.goo.gl/jXzeEc7biMeBvQhK6" }
+                        ] 
+                    }
+                ]
+            },
+            {
+                tabLabel: "Day 9", date: "5/03 (週日)", theme: "名城巡禮與名古屋之夜",
+                weatherAdvice: {
+                    temp: "22°C~26°C (日) / 14°C~16°C (夜)",
+                    dress: "名古屋市區氣候溫暖。建議春季輕便穿搭即可，白天短袖加薄外套，適合長時間在戶外景點（如名古屋城、德川園）走動。"
+                },
+                souvenirs: [
+                    { icon: "cookie", title: "坂角總本舖 蝦餅", text: "名古屋必買伴手禮「ゆかり」，擁有極致濃郁的蝦味與酥脆口感，長輩最愛的金牌伴手禮。" },
+                    { icon: "coffee", title: "小倉吐司抹醬", text: "將客美多咖啡的靈魂帶回家！帶有顆粒的紅豆泥抹醬，讓您在家也能重現名古屋特有的早餐文化。" }
+                ],
+                events: [
+                    { 
+                        time: "08:30", type: "spot", title: "熱田神宮", 
+                        desc: "日本地位最崇高、最古老的神社之一。\n這裡供奉著傳說中的三神器——草薙劍，散發著神聖的靈氣。", dur: "1h" 
+                    },
+                    { 
+                        time: "10:00", type: "spot", title: "德川園", 
+                        desc: "大名庭園特有的優雅姿態。以遼闊的「龍仙湖」為核心，展現日本庭園美學。", dur: "2h" 
+                    },
+                    { time: "12:30", type: "food", title: "午餐饗宴", note: "建議挑選熱門名古屋鰻魚飯或名物料理" },
+                    { 
+                        time: "15:00", type: "spot", title: "名古屋城", 
+                        desc: "江戶幕府威權的象徵。本丸御殿內部的金箔壁畫與木構工藝是豪奢美學的巔峰之作。", dur: "2.5h" 
+                    },
+                    { time: "18:00", type: "food", title: "最後一晚大餐", note: "建議預約熱門餐廳慶祝行程完結" }
+                ]
+            },
+            {
+                tabLabel: "Day 10", date: "5/04 (週一)", theme: "回味那古野：帶著回憶返台",
+                weatherAdvice: {
+                    temp: "20°C~25°C (日)",
+                    dress: "準備返程。建議穿著輕鬆休閒的衣物，方便辦理登機與通過安檢。請隨身攜帶一件薄外套，以應對機場室內與飛機客艙內較強的冷氣。"
+                },
+                souvenirs: [
+                    { icon: "plane", title: "機場 蝦仙貝之里", text: "中部機場內的人氣店鋪，提供多種口味試吃，大包裝性價比極高，非常適合帶回辦公室分送。" },
+                    { icon: "cookie", title: "赤福餅", text: "雖然來自伊勢，但在中部機場極受歡迎！柔軟細緻的紅豆泥包裹著麻糬，保存期限極短需注意。" }
+                ],
+                events: [
+                    { time: "09:00", type: "experience", title: "名古屋市區自由購物", note: "整理行李與最後採買" },
+                    { time: "11:00", type: "transport", title: "前往中部機場", note: "搭乘機場快捷 (µ-SKY)", drive: "🚗 辦理還車手續" },
+                    { time: "14:00", type: "transport", title: "飛機返台", desc: "帶著滿滿的回憶與戰利品踏上歸途。" }
+                ]
+            },
+            {
+                tabLabel: "旅途成就", date: "回憶總結", theme: "解鎖您的專屬那古野成就", isAchievement: true,
+                stats: [
+                    { label: "總天數", value: "10", unit: "天", icon: "calendar" },
+                    { label: "預計足跡", value: "35+", unit: "處", icon: "map-pin" },
+                    { label: "推薦特產", value: "18", unit: "項", icon: "gift" },
+                    { label: "累積回憶", value: "∞", unit: "無價", icon: "camera" }
+                ],
+                badges: [
+                    { id: "castle", name: "名城巡禮者", desc: "走訪岐阜、郡上、犬山與名古屋城，見證戰國歷史與建築之美。", icon: "landmark", color: "text-amber-600", bg: "bg-amber-100", border: "border-amber-300" },
+                    { id: "nature", name: "秘境探險家", desc: "深入白川鄉、上高地與付知峽，擁抱日本中部絕美自然。", icon: "mountain", color: "text-emerald-600", bg: "bg-emerald-100", border: "border-emerald-300" },
+                    { id: "star", name: "星空漫步者", desc: "在阿智村天空樂園，將日本第一的星空盡收眼底。", icon: "star", color: "text-indigo-600", bg: "bg-indigo-100", border: "border-indigo-300" },
+                    { id: "onsen", name: "溫泉療癒大師", desc: "享受平湯、下呂等名湯，洗滌旅途的疲憊與壓力。", icon: "droplets", color: "text-cyan-600", bg: "bg-cyan-100", border: "border-cyan-300" },
+                    { id: "food", name: "在地美食家", desc: "品嚐飛驒牛、冷狸貓烏龍、小倉吐司，徹底征服味蕾。", icon: "utensils", color: "text-rose-600", bg: "bg-rose-100", border: "border-rose-300" },
+                    { id: "driver", name: "公路傳奇", desc: "挑戰跨越山區與城市的極限自駕，享受無拘無束的自由旅程。", icon: "car", color: "text-blue-600", bg: "bg-blue-100", border: "border-blue-300" }
+                ]
+            }
+        ];
+
+        const { useState, useEffect } = React;
+
+        /**
+         * 2. 子組件層 (Components)
+         */
+        const RestaurantList = ({ restaurants }) => {
+            if (!restaurants) return null;
+            return (
+                <div className="space-y-3">
+                    <h4 className="text-[10px] md:text-xs font-black text-[#8E8377] uppercase tracking-[0.2em] flex items-center gap-2 pl-1">
+                        <i data-lucide="utensils" className="w-3.5 h-3.5" aria-hidden="true"></i> 餐廳名單 (點擊導航)
+                    </h4>
+                    <div className="flex flex-col">
+                        {restaurants.map((r, ri) => (
+                            <a key={ri} href={r.url} target="_blank" rel="noopener noreferrer" className="restaurant-link focus-visible:ring-2 focus-visible:ring-indigo-500">
+                                <span className="flex-1">{r.name}</span>
+                                <i data-lucide="external-link" className="w-3.5 h-3.5 opacity-40" aria-hidden="true"></i>
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const SupplyList = ({ supplies }) => {
+            if (!supplies || supplies.length === 0) return null;
+            return (
+                <div className="space-y-3 mt-4">
+                    <h4 className="text-[10px] md:text-xs font-black text-emerald-700 uppercase tracking-[0.2em] flex items-center gap-2 pl-1">
+                        <i data-lucide="shopping-bag" className="w-3.5 h-3.5" aria-hidden="true"></i> 超市補給名單 (點擊導航)
+                    </h4>
+                    <div className="flex flex-col">
+                        {supplies.map((s, idx) => (
+                            <a key={idx} href={s.url} target="_blank" rel="noopener noreferrer" className="supply-link focus-visible:ring-2 focus-visible:ring-emerald-500">
+                                <div className="flex items-center gap-2 w-full">
+                                    <span className="flex-1 font-bold text-[13px] md:text-sm truncate">{s.name}</span>
+                                    <i data-lucide="external-link" className="w-3.5 h-3.5 opacity-40 shrink-0" aria-hidden="true"></i>
+                                </div>
+                                {s.note && <span className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">{s.note}</span>}
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const ParkingList = ({ parking }) => {
+            if (!parking || parking.length === 0) return null;
+            return (
+                <div className="space-y-3">
+                    <h4 className="text-[10px] md:text-xs font-black text-blue-700 uppercase tracking-[0.2em] flex items-center gap-2 pl-1">
+                        <i data-lucide="navigation" className="w-3.5 h-3.5" aria-hidden="true"></i> 停車場資訊 (點擊導航)
+                    </h4>
+                    <div className="flex flex-col">
+                        {parking.map((p, idx) => (
+                            <a key={idx} href={p.url} target="_blank" rel="noopener noreferrer" className="parking-link focus-visible:ring-2 focus-visible:ring-blue-500">
+                                <span className="bg-blue-600 text-white rounded-[4px] px-[6px] py-[2px] leading-none text-[10px] tracking-widest font-black shrink-0">P</span>
+                                {p.label && <span className="text-blue-700 text-[10px] border border-blue-200 bg-white px-1.5 py-0.5 rounded-[4px] shrink-0 font-bold">{p.label}</span>}
+                                <span className="flex-1 text-sm font-bold truncate">{p.name}</span>
+                                <i data-lucide="external-link" className="w-3.5 h-3.5 opacity-40" aria-hidden="true"></i>
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const FeatureCard = ({ icon, title, text, colorClass = "text-indigo-700" }) => (
+            <div className="space-y-2 md:space-y-3 bg-white/40 p-5 md:p-6 rounded-2xl md:rounded-3xl border border-[#D4C7B8]/30 hover:bg-white/70 transition-colors">
+                <p className={`${colorClass} font-black text-xs uppercase tracking-widest flex items-center gap-2`}>
+                    <i data-lucide={icon} className="w-4 h-4" aria-hidden="true"></i> {title}
+                </p>
+                <p className="text-xs md:text-sm text-slate-600 leading-relaxed font-medium">{text}</p>
+            </div>
+        );
+
+        const EventCard = ({ event, dayIndex, eventIndex, completed, onToggle }) => {
+            const isCompleted = completed[`${dayIndex}-${eventIndex}`];
+            const getBadgeStyle = (t) => {
+                const styles = { spot: 'bg-indigo-600', food: 'bg-amber-600', transport: 'bg-slate-500', experience: 'bg-purple-600', hotel: 'bg-blue-700' };
+                return styles[t] || 'bg-gray-400';
+            };
+
+            return (
+                <div className={`flex flex-col lg:flex-row gap-4 md:gap-8 lg:gap-20 relative ${event.isLast ? 'last-event' : ''}`}>
+                    <div className="lg:w-[30%] flex gap-4 md:gap-6 relative shrink-0">
+                        <div className="relative flex flex-col items-center shrink-0">
+                            <button 
+                                onClick={onToggle} 
+                                aria-pressed={isCompleted}
+                                aria-label={`標記 ${event.time} ${event.title} ${isCompleted ? '為未完成' : '為已完成'}`}
+                                className="relative z-10 bg-white shadow-md border border-[#D4C7B8] rounded-full transition-transform active:scale-90 p-1 focus-visible:ring-2 focus-visible:ring-indigo-500">
+                                <i data-lucide={isCompleted ? "check-circle-2" : "circle"} 
+                                   className={`w-5 h-5 md:w-6 md:h-6 ${isCompleted ? "text-green-500" : "text-[#D4C7B8]"}`} aria-hidden="true"></i>
+                            </button>
+                            <div className="timeline-line"></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className="text-2xl md:text-3xl font-black font-mono tracking-tighter text-slate-800">{event.time}</span>
+                                <span className={`px-2 py-0.5 rounded text-[9px] text-white font-bold uppercase tracking-wider ${getBadgeStyle(event.type)}`}>{event.type}</span>
+                            </div>
+                            
+                            <h3 className={`font-black text-base md:text-xl leading-tight truncate ${isCompleted ? 'text-[#B0A496] line-through' : 'text-slate-800'}`}>{event.title}</h3>
+                            {event.drive && (
+                                <div className="mt-2 md:mt-4 flex items-center gap-2 text-[10px] md:text-[11px] font-bold text-indigo-700 bg-white/40 px-2 md:px-3 py-1.5 rounded-lg w-fit border border-indigo-200/50">
+                                    <i data-lucide="car" className="w-3 h-3" aria-hidden="true"></i> {event.drive}
+                                </div>
+                            )}
+                            
+                            {(event.type === 'spot' || event.type === 'experience' || event.type === 'hotel' || event.mapUrl) && (
+                                <div className="mt-3">
+                                    <a href={event.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.title)}`}
+                                       target="_blank" rel="noopener noreferrer" className="spot-map-btn focus-visible:ring-2 focus-visible:ring-indigo-500">
+                                        <i data-lucide="map-pin" className="w-3 h-3" aria-hidden="true"></i> 導航
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="lg:w-[70%] pl-9 md:pl-11 lg:pl-0">
+                        <div className="bg-white p-5 md:p-8 rounded-2xl md:rounded-[2.5rem] border border-[#D4C7B8]/40 shadow-sm md:shadow-[0_15px_50px_rgba(176,164,150,0.1)] hover:shadow-md transition-all duration-500">
+                            <div className="space-y-4 md:space-y-6">
+                                {event.desc && (
+                                    <p className="culture-card p-5 md:p-8 rounded-xl md:rounded-3xl text-slate-700 text-sm md:text-[15px] leading-relaxed md:leading-[2.2] font-medium whitespace-pre-line shadow-inner">
+                                        {event.desc}
+                                    </p>
+                                )}
+
+                                <ParkingList parking={event.parking} />
+                                <SupplyList supplies={event.supplies} />
+                                <RestaurantList restaurants={event.restaurants} />
+
+                                {event.note && !event.restaurants && !event.supplies && (
+                                    <div className="flex items-start gap-3 text-[#8E8377] text-xs md:text-sm bg-[#F5F2ED] p-4 md:p-5 rounded-xl italic font-medium border border-[#D4C7B8]/30">
+                                        <i data-lucide="info" className="w-4 h-4 mt-0.5 opacity-50 shrink-0" aria-hidden="true"></i>
+                                        {event.note}
+                                    </div>
+                                )}
+
+                                {event.dur && (
+                                    <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-black text-[#8E8377] uppercase tracking-widest pl-2">
+                                        <i data-lucide="clock" className="w-3 h-3" aria-hidden="true"></i> 建議停留: {event.dur}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        /**
+         * 3. 主程式層 (App)
+         */
+        const App = () => {
+            const [activeDay, setActiveDay] = useState(0);
+            
+            const [completed, setCompleted] = useState(() => {
+                const saved = localStorage.getItem('nagoya-completed');
+                return saved ? JSON.parse(saved) : {};
+            });
+            const [checkedItems, setCheckedItems] = useState(() => {
+                const saved = localStorage.getItem('nagoya-checked');
+                return saved ? JSON.parse(saved) : {};
+            });
+            const [isOffline, setIsOffline] = useState(!navigator.onLine);
+            const [swError, setSwError] = useState(null);
+
+            // 監聽網路狀態與 SW 註冊事件
+            useEffect(() => {
+                const handleOnline = () => setIsOffline(false);
+                const handleOffline = () => setIsOffline(true);
+                const handleSwStatus = (e) => {
+                    if (e.detail.status === 'error') {
+                        setSwError(e.detail.message);
+                    }
+                };
+
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+                window.addEventListener('sw-status', handleSwStatus);
+                return () => {
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
+                    window.removeEventListener('sw-status', handleSwStatus);
+                };
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('nagoya-completed', JSON.stringify(completed));
+            }, [completed]);
+
+            useEffect(() => {
+                localStorage.setItem('nagoya-checked', JSON.stringify(checkedItems));
+            }, [checkedItems]);
+
+            useEffect(() => {
+                if (window.lucide) { window.lucide.createIcons(); }
+            }, [activeDay, isOffline, completed, checkedItems, swError]);
+
+            const current = ITINERARY_DATA[activeDay];
+
+            const toggleComplete = (dIndex, eIndex) => {
+                setCompleted(prev => ({ ...prev, [`${dIndex}-${eIndex}`]: !prev[`${dIndex}-${eIndex}`] }));
+            };
+
+            const toggleChecklistItem = (listIndex, itemIndex) => {
+                setCheckedItems(prev => ({ ...prev, [`${listIndex}-${itemIndex}`]: !prev[`${listIndex}-${itemIndex}`] }));
+            };
+
+            const retrySwRegistration = () => {
+                setSwError(null);
+                window.location.reload(); // 單檔架構下最直接的重試方式
+            };
+
+            // 計算動態打卡進度 (排除行前準備與成就頁面本身)
+            const totalEvents = ITINERARY_DATA.reduce((acc, day) => day.events ? acc + day.events.length : acc, 0);
+            const completedEventsCount = Object.values(completed).filter(Boolean).length;
+            const progressPercentage = totalEvents === 0 ? 0 : Math.round((completedEventsCount / totalEvents) * 100);
+
+            return (
+                <div className="pb-20 md:pb-24">
+                    <header className="bg-white/70 backdrop-blur-lg sticky top-0 z-50 border-b border-[#D4C7B8] px-4 md:px-6 py-4 shadow-sm">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <div className="bg-slate-800 p-2 rounded-xl text-white shadow-lg shrink-0">
+                                    <i data-lucide="navigation" className="w-5 h-5" aria-hidden="true"></i>
+                                </div>
+                                <h1 className="text-base md:text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
+                                    超絕那古野行
+                                    {isOffline && (
+                                        <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-amber-200 shadow-sm shrink-0">
+                                            <i data-lucide="wifi-off" className="w-3 h-3" aria-hidden="true"></i> 離線中
+                                        </span>
+                                    )}
+                                </h1>
+                            </div>
+                            {/* 加上 aria-label 與 aria-current 提示 */}
+                            <nav className="flex bg-[#DCD4C9] p-1 rounded-xl no-scrollbar overflow-x-auto w-full md:w-auto" aria-label="行程天數導航">
+                                {ITINERARY_DATA.map((day, i) => (
+                                    <button key={i} onClick={() => setActiveDay(i)}
+                                        aria-current={activeDay === i ? 'page' : undefined}
+                                        className={`px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold transition-all whitespace-nowrap focus-visible:ring-2 focus-visible:ring-indigo-500 ${activeDay === i ? 'nav-active' : 'text-slate-600 hover:text-slate-900'}`}>
+                                        {day.tabLabel}
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+                    </header>
+
+                    {/* SW 錯誤提示 Toast */}
+                    {swError && (
+                        <div className="bg-red-50 border-l-4 border-red-500 p-4 mx-4 md:mx-auto mt-6 max-w-7xl rounded shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4" role="alert">
+                            <div className="flex items-center gap-3">
+                                <i data-lucide="alert-circle" className="text-red-500 w-5 h-5 shrink-0" aria-hidden="true"></i>
+                                <p className="text-sm text-red-700 font-medium">{swError}</p>
+                            </div>
+                            <div className="flex gap-3 w-full md:w-auto pl-8 md:pl-0">
+                                <button onClick={retrySwRegistration} className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded font-bold transition-colors focus-visible:ring-2 focus-visible:ring-red-500">重新嘗試</button>
+                                <button onClick={() => setSwError(null)} aria-label="關閉提示" className="text-red-400 hover:text-red-700 p-1.5 rounded focus-visible:ring-2 focus-visible:ring-red-500">
+                                    <i data-lucide="x" className="w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <main key={activeDay} className="max-w-7xl mx-auto px-4 md:px-6 py-10 md:py-16">
+                        <div className="mb-10 md:mb-20 text-center lg:text-left">
+                            <p className="text-indigo-700 text-[10px] md:text-xs font-black tracking-[0.2em] uppercase mb-2">Self-Drive Journey</p>
+                            <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+                                {current.date} <span className="text-[#B0A496] mx-1">/</span> <br className="md:hidden" />
+                                <span className="text-indigo-800">{current.theme}</span>
+                            </h2>
+                        </div>
+
+                        {current.isPrep ? (
+                            /* 行前準備專屬版面 */
+                            <div className="space-y-12">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
+                                    {current.memos.map((m, i) => (
+                                        <FeatureCard key={i} icon={m.icon} title={m.title} text={m.text} colorClass="text-indigo-700" />
+                                    ))}
+                                </div>
+                                {/* 更新 grid-cols，加入 lg:grid-cols-3 讓三個清單並排 */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mt-10">
+                                    {current.checklists.map((list, i) => (
+                                        <div key={i} className="bg-white p-6 md:p-8 rounded-[2rem] border border-[#D4C7B8]/40 shadow-sm">
+                                            <h4 className="font-black text-lg text-slate-800 mb-6 flex items-center gap-3">
+                                                <i data-lucide="check-square" className="text-emerald-600" aria-hidden="true"></i> {list.title}
+                                            </h4>
+                                            <ul className="space-y-4">
+                                                {list.items.map((item, j) => {
+                                                    const isChecked = checkedItems[`${i}-${j}`];
+                                                    return (
+                                                        <li key={j} className="flex">
+                                                            {/* 重構成標準具備鍵盤與無障礙支援的按鈕 */}
+                                                            <button 
+                                                                type="button"
+                                                                role="checkbox"
+                                                                aria-checked={isChecked}
+                                                                aria-label={`標記 ${item} ${isChecked ? '為未完成' : '為已完成'}`}
+                                                                onClick={() => toggleChecklistItem(i, j)}
+                                                                className="flex items-start gap-3 text-sm md:text-base text-slate-700 font-medium cursor-pointer select-none group w-full text-left focus-visible:ring-2 focus-visible:ring-emerald-500 rounded py-1">
+                                                                
+                                                                <div className={`w-5 h-5 shrink-0 mt-0.5 rounded border flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 group-hover:border-emerald-400'}`}>
+                                                                    <svg className={`w-3.5 h-3.5 text-white transition-opacity ${isChecked ? 'opacity-100' : 'opacity-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} aria-hidden="true">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                </div>
+                                                                <span className={`transition-all ${isChecked ? 'text-slate-400 line-through' : ''}`}>
+                                                                    {item}
+                                                                </span>
+                                                            </button>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : current.isAchievement ? (
+                            /* 旅途成就專屬版面 */
+                            <div className="space-y-12">
+                                {/* 動態打卡進度條 */}
+                                <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-[#D4C7B8]/40 shadow-sm text-center relative overflow-hidden">
+                                    <h3 className="text-xl md:text-2xl font-black text-slate-800 mb-2 flex justify-center items-center gap-2 relative z-10">
+                                        <i data-lucide="medal" className="text-yellow-500" aria-hidden="true"></i> 旅途達成率
+                                    </h3>
+                                    <p className="text-sm text-slate-500 font-medium mb-6 relative z-10">點擊行程列表左側的空心圓圈，紀錄您的專屬打卡足跡</p>
+                                    
+                                    <div className="w-full bg-slate-100 rounded-full h-6 md:h-8 mb-4 overflow-hidden border border-slate-200 relative z-10">
+                                        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end px-3 min-w-[2rem]" style={{ width: `${progressPercentage}%` }}>
+                                            <span className="text-white text-xs font-bold drop-shadow-md">{progressPercentage}%</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-slate-700 font-bold relative z-10">已完成 {completedEventsCount} / {totalEvents} 個行程節點</p>
+                                    
+                                    {/* 背景裝飾 */}
+                                    <i data-lucide="flag" className="absolute -bottom-6 -left-4 w-32 h-32 opacity-5 text-indigo-500 transform -rotate-12 z-0" aria-hidden="true"></i>
+                                </div>
+
+                                {/* 數據統計儀表板 */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                                    {current.stats.map((s, i) => (
+                                        <div key={i} className="bg-gradient-to-br from-white to-slate-50 p-5 rounded-2xl border border-[#D4C7B8]/40 shadow-sm flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-transform">
+                                            <div className="bg-indigo-100 text-indigo-600 p-3 rounded-full mb-3 shadow-sm">
+                                                <i data-lucide={s.icon} className="w-6 h-6" aria-hidden="true"></i>
+                                            </div>
+                                            <p className="text-xs text-slate-500 font-bold mb-1 tracking-widest uppercase">{s.label}</p>
+                                            <p className="text-2xl md:text-3xl font-black text-slate-800 tracking-tighter">{s.value}<span className="text-sm font-bold text-slate-500 ml-1">{s.unit}</span></p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* 成就徽章牆 */}
+                                <div className="mt-10">
+                                    <h4 className="text-slate-800 font-black text-lg md:text-xl mb-6 md:mb-8 flex items-center gap-3">
+                                        <i data-lucide="award" className="text-yellow-500" aria-hidden="true"></i> 解鎖成就徽章
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                                        {current.badges.map((badge, i) => {
+                                            // 隨著打卡進度 (15%, 30%, 45%...) 逐步解鎖徽章
+                                            const isUnlocked = progressPercentage >= ((i + 1) * 15);
+                                            return (
+                                                <div key={i} className={`p-5 rounded-[1.5rem] border ${isUnlocked ? badge.border : 'border-slate-200'} ${isUnlocked ? badge.bg : 'bg-slate-50'} relative overflow-hidden transition-all duration-500`}>
+                                                    <div className="flex items-start gap-4 relative z-10">
+                                                        <div className={`p-3 rounded-xl shrink-0 transition-colors duration-500 ${isUnlocked ? 'bg-white shadow-sm' : 'bg-slate-200'} ${isUnlocked ? badge.color : 'text-slate-400'}`}>
+                                                            <i data-lucide={isUnlocked ? badge.icon : 'lock'} className="w-6 h-6" aria-hidden="true"></i>
+                                                        </div>
+                                                        <div>
+                                                            <h5 className={`font-black text-base md:text-lg mb-1.5 transition-colors duration-500 ${isUnlocked ? 'text-slate-800' : 'text-slate-400'}`}>{badge.name}</h5>
+                                                            <p className={`text-xs leading-relaxed font-medium transition-colors duration-500 ${isUnlocked ? 'text-slate-700/90' : 'text-slate-400'}`}>{isUnlocked ? badge.desc : `行程達成率達 ${(i + 1) * 15}% 即可解鎖！`}</p>
+                                                        </div>
+                                                    </div>
+                                                    {/* 徽章背景浮水印 */}
+                                                    {isUnlocked && (
+                                                        <i data-lucide="check-circle" className={`absolute -bottom-4 -right-4 w-24 h-24 opacity-10 ${badge.color} transform -rotate-12 z-0`} aria-hidden="true"></i>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* 每日行程常規版面 */
+                            <div className="relative">
+                                {/* 新增：歷史氣候與穿衣建議區塊 */}
+                                {current.weatherAdvice && (
+                                    <div className="bg-gradient-to-r from-blue-50 to-sky-50/50 border border-blue-200/60 rounded-2xl md:rounded-[2rem] p-5 md:p-6 mb-10 md:mb-16 shadow-[inset_0_0_20px_rgba(255,255,255,0.8)] flex flex-col md:flex-row items-start gap-4">
+                                        <div className="bg-blue-600 text-white p-2.5 rounded-xl md:rounded-2xl shrink-0 shadow-sm md:mt-1">
+                                            <i data-lucide="cloud-sun" className="w-5 h-5 md:w-6 md:h-6" aria-hidden="true"></i>
+                                        </div>
+                                        <div className="w-full">
+                                            <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-3">
+                                                <h3 className="font-black text-blue-900 text-sm md:text-base tracking-wide">歷史氣象與穿衣指南</h3>
+                                                <span className="text-[10px] md:text-xs font-bold text-blue-700 bg-white px-2 py-1 rounded-lg border border-blue-200 shadow-sm flex items-center gap-1.5 whitespace-nowrap">
+                                                    <i data-lucide="thermometer" className="w-3 h-3" aria-hidden="true"></i> {current.weatherAdvice.temp}
+                                                </span>
+                                            </div>
+                                            <p className="text-[13px] md:text-[15px] text-blue-900/80 leading-relaxed font-medium">
+                                                {current.weatherAdvice.dress}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="timeline-line-center hidden lg:block"></div>
+                                <div className="space-y-12 md:space-y-24">
+                                    {current.events.map((ev, i) => (
+                                        <EventCard 
+                                            key={i} 
+                                            event={{ ...ev, isLast: i === current.events.length - 1 }} 
+                                            dayIndex={activeDay} 
+                                            eventIndex={i}
+                                            completed={completed}
+                                            onToggle={() => toggleComplete(activeDay, i)}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 特產與紀念品 (非行前準備頁面才顯示) */}
+                        {!current.isPrep && current.souvenirs && current.souvenirs.length > 0 && (
+                            <div className="mt-20 md:mt-32 border-t border-[#D4C7B8] pt-10 md:pt-16">
+                                <h4 className="text-slate-800 font-black text-lg md:text-xl mb-6 md:mb-8 flex items-center gap-3">
+                                    <i data-lucide="gift" className="text-pink-600" aria-hidden="true"></i> 地區特產與紀念品推薦
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+                                    {current.souvenirs.map((s, idx) => (
+                                        <FeatureCard key={idx} icon={s.icon} title={s.title} text={s.text} colorClass="text-pink-600" />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
